@@ -68,7 +68,7 @@ The final positional file is the GTF/GFF annotation. All preceding positional fi
 - `-p, --samout-format`: `SAM` or `BAM`.
 - `--version`: print the program version.
 
-A Rust-specific `--threads` option controls BAM/CRAM decoding threads per input file. This is deliberately separate from HTSeq's `-n/--nprocesses`.
+A Rust-specific `--threads` option controls decoder parallelism per input file and is separate from HTSeq's `-n/--nprocesses`. On the native BAM path, the value is the number of additional BGZF decompression workers, so `--threads 0` disables extra workers.
 
 ### Input compatibility
 
@@ -202,7 +202,7 @@ The scaling report includes median wall time, peak RSS, the HTSeq/TallySeq runti
 
 ## Performance
 
-The release benchmark uses HTSeq 2.1.2 and TallySeq 0.1.0 with TallySeq `--threads 1` and both tools `-n 1`. Each real-data dataset/scenario combination is measured five times after exact normalized count equality is confirmed. The benchmark covers 31 scenarios on each of two Pasilla chromosome 4 datasets, for 62 dataset/scenario comparisons and 620 timed executions.
+The release benchmark uses HTSeq 2.1.2 and TallySeq 0.1.0 with TallySeq `--threads 1` and both tools `-n 1`. On the native BAM reader, `--threads 1` means one additional BGZF decompression worker. Each real-data dataset/scenario combination is measured five times after exact normalized count equality is confirmed. The benchmark covers 31 scenarios on each of two Pasilla chromosome 4 datasets, for 62 dataset/scenario comparisons and 620 timed executions.
 
 Across those comparisons, the median of the per-comparison median runtimes is 0.58 s for TallySeq and 14.59 s for HTSeq. The median pairwise runtime ratio is 26.1x, with a range of 18.7x to 29.1x. Median peak RSS is 28.1 MiB for TallySeq and 73.8 MiB for HTSeq.
 
@@ -218,3 +218,17 @@ The controlled read-count scaling benchmark keeps the real Pasilla alignment dis
 Linear fits give 0.964 s per million alignments for TallySeq (R² = 0.9998) and 20.911 s per million for HTSeq (R² = 0.9931). All reported scaling runs passed exact normalized count equality.
 
 The benchmark environment and toolchain are recorded in the generated JSON and manuscript provenance files, including CPU, logical CPU count, RAM, kernel/platform, Python, Rust/Cargo, Git commit, filesystem, thread/process settings, and execution order.
+
+### Large biological dataset
+
+A separate benchmark uses SRR5724993, a coordinate-sorted human RNA-seq alignment with 58,663,336 mapped primary single-end records and a 145 MiB human annotation GTF. BAM, SAM and CRAM representations contain the same records, and every reported TallySeq run produced exactly the same count table as HTSeq 2.1.2.
+
+| Format | TallySeq median | HTSeq median | HTSeq/TallySeq | TallySeq RSS | HTSeq RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| BAM | 41.93 s | 1092.65 s | 26.06x | 75.6 MiB | 134.6 MiB |
+| SAM | 104.67 s | 1449.67 s | 13.85x | 75.5 MiB | 134.5 MiB |
+| CRAM | 356.66 s | 1685.27 s | 4.73x | 87.3 MiB | 148.5 MiB |
+
+The strict BAM comparison uses TallySeq `--threads 0`, which disables additional BGZF decompression workers. The SAM reader is not affected by that BAM setting. CRAM on Unix is decoded through the HTSlib compatibility path and materialized as a temporary BAM before counting, so its reported runtime includes conversion and temporary-file I/O.
+
+
