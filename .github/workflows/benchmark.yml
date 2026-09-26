@@ -29,7 +29,7 @@ on:
         type: boolean
         default: false
       rust_threads:
-        description: "TallySeq BAM decoding threads"
+        description: "TallySeq --threads setting (native BAM: additional BGZF workers)"
         required: false
         default: "1"
       run_scaling:
