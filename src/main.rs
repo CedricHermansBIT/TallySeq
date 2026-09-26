@@ -567,7 +567,7 @@ struct Args {
     #[arg(
         long = "threads",
         default_value = "4",
-        help = "BAM/CRAM decompression threads per input file (Rust extension; default: 4)"
+        help = "Decoder parallelism per input file (Rust extension; native BAM uses this many additional BGZF workers; default: 4)"
     )]
     threads: u16,
 
