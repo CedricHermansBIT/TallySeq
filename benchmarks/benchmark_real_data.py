@@ -647,7 +647,7 @@ def write_markdown(report: dict, path: Path):
         f"Source: Zenodo DOI {DOI}",
         f"HTSeq version: {report['htseq_version']}",
         f"Rust version: {report['rust_version']}",
-        f"TallySeq threads: {report['benchmark_settings']['tallyseq_threads']}",
+        f"TallySeq --threads setting: {report['benchmark_settings']['tallyseq_threads']}",
         f"Processes (-n): {report['benchmark_settings']['nprocesses']}",
         f"CPU: {report['system'].get('cpu_model') or 'unknown'}",
         f"Logical CPUs: {report['system'].get('cpu_count_logical')}",
@@ -720,7 +720,7 @@ def main():
         "--rust-threads",
         type=int,
         default=1,
-        help="TallySeq BAM/CRAM decoding threads. Default: 1 for a fair single-thread benchmark.",
+        help="TallySeq --threads setting. Native BAM interprets this as additional BGZF decompression workers; use 0 for none. Default: 1.",
     )
     ap.add_argument(
         "--nprocesses",
@@ -745,8 +745,8 @@ def main():
 
     if args.repeats < 1:
         ap.error("--repeats must be >= 1")
-    if args.rust_threads < 1:
-        ap.error("--rust-threads must be >= 1")
+    if args.rust_threads < 0:
+        ap.error("--rust-threads must be >= 0")
     if args.nprocesses < 1:
         ap.error("--nprocesses must be >= 1")
 
