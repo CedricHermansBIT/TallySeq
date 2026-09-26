@@ -1,0 +1,4 @@
+format	TallySeq_seconds	HTSeq_seconds	speedup	TallySeq_peak_RSS_MiB	HTSeq_peak_RSS_MiB
+BAM	41.93	1092.65	26.0589	75.55	134.57
+SAM	104.67	1449.67	13.8499	75.49	134.54
+CRAM	356.66	1685.27	4.7251	87.25	148.46
