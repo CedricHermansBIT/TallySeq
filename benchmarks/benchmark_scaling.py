@@ -154,7 +154,7 @@ def write_markdown(report: dict, path: Path) -> None:
         f"Dataset: {report['dataset']}",
         f"HTSeq version: {report['htseq_version']}",
         f"TallySeq version: {report['rust_version']}",
-        f"TallySeq threads: {settings['tallyseq_threads']}",
+        f"TallySeq --threads setting: {settings['tallyseq_threads']}",
         f"Processes (-n): {settings['nprocesses']}",
         f"Repeats: {settings['repeats']}",
         f"CPU: {system.get('cpu_model') or 'unknown'}",
@@ -250,8 +250,8 @@ def main() -> int:
 
     if args.repeats < 1:
         ap.error("--repeats must be >= 1")
-    if args.rust_threads < 1:
-        ap.error("--rust-threads must be >= 1")
+    if args.rust_threads < 0:
+        ap.error("--rust-threads must be >= 0")
     if args.nprocesses < 1:
         ap.error("--nprocesses must be >= 1")
 
