@@ -14,6 +14,7 @@
 \hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue}
 \input{benchmark_macros.tex}
 \input{scaling_macros.tex}
+\input{large_biological_macros.tex}
 
 \title{TallySeq: a high-performance, HTSeq-compatible read counting tool in Rust}
 \author[1]{Cedric Hermans}
@@ -24,7 +25,7 @@
 \maketitle
 
 \begin{abstract}
-Read summarization against genomic annotations remains a routine step in sequencing workflows. \texttt{htseq-count} is widely used because its treatment of strandedness, ambiguous overlaps, multimapping reads, paired-end fragments, and annotation attributes is well established, but its runtime can become substantial when many alignments are processed. We present TallySeq, a Rust implementation designed to reproduce HTSeq 2.1.2 counting semantics while reducing runtime and memory use. TallySeq supports single- and paired-end SAM/BAM input, CRAM on Linux and macOS, the three HTSeq overlap modes, strandedness modes, nonunique-read handling, multi-file processing, annotation metadata, annotated SAM/BAM output, and tabular, Matrix Market, H5AD, and Loom count output. Correctness is assessed by differential tests against HTSeq 2.1.2, targeted interval and CIGAR edge cases, upstream HTSeq fixtures, and real-data scenarios. In a repeated real-data benchmark using two Drosophila Pasilla chromosome 4 datasets and the matching Ensembl annotation, all \BenchmarkExactScenarioCount{} dataset--scenario comparisons across \BenchmarkScenarioCount{} scenarios produced exactly identical count tables. Each tool was run \BenchmarkRepeats{} times per comparison with single-thread settings. Across dataset--scenario medians, TallySeq required \SI{\MedianTallyTime}{\second} compared with \SI{\MedianHTSeqTime}{\second} for HTSeq, a median \MedianSpeedup{}-fold speed ratio (range \MinimumSpeedup{}--\MaximumSpeedup{}). Median peak resident memory was \MedianTallyRSS{}~MiB and \MedianHTSeqRSS{}~MiB, respectively. In controlled read-count scaling to 10 million alignments, median runtime was \SI{\ScalingTallyTenMTime}{\second} for TallySeq and \SI{\ScalingHTSeqTenMTime}{\second} for HTSeq. Linear fits gave slopes of \ScalingTallySlope{} and \ScalingHTSeqSlope{} seconds per million alignments, respectively.
+Read summarization against genomic annotations remains a routine step in sequencing workflows. \texttt{htseq-count} is widely used because its treatment of strandedness, ambiguous overlaps, multimapping reads, paired-end fragments, and annotation attributes is well established, but its runtime can become substantial when many alignments are processed. We present TallySeq, a Rust implementation designed to reproduce HTSeq 2.1.2 counting semantics while reducing runtime and memory use. TallySeq supports single- and paired-end SAM/BAM input, CRAM on Linux and macOS, the three HTSeq overlap modes, strandedness modes, nonunique-read handling, multi-file processing, annotation metadata, annotated SAM/BAM output, and tabular, Matrix Market, H5AD, and Loom count output. Correctness is assessed by differential tests against HTSeq 2.1.2, targeted interval and CIGAR edge cases, upstream HTSeq fixtures, and real-data scenarios. In a repeated Pasilla benchmark using two Drosophila chromosome 4 datasets and the matching annotation, all \BenchmarkExactScenarioCount{} dataset--scenario comparisons across \BenchmarkScenarioCount{} scenarios produced exactly identical count tables. Across dataset--scenario medians, TallySeq required \SI{\MedianTallyTime}{\second} compared with \SI{\MedianHTSeqTime}{\second} for HTSeq, a median \MedianSpeedup{}-fold runtime ratio. In a separate human RNA-seq benchmark containing \LargeAlignmentCount{} mapped alignments, BAM counting required a median \SI{\LargeBamTallyTime}{\second} with TallySeq and \SI{\LargeBamHTSeqTime}{\second} with HTSeq, a \LargeBamSpeedup{}-fold ratio, with exact count equality. Controlled scaling to 10 million alignments gave fitted slopes of \ScalingTallySlope{} and \ScalingHTSeqSlope{} seconds per million alignments, respectively.
 \end{abstract}
 
 \section{Introduction}
@@ -77,13 +78,22 @@ Measurements were collected with TallySeq 0.1.0 and HTSeq 2.1.2 on an Intel Core
 
 A second benchmark isolates the effect of alignment count. It starts from the real \texttt{GSM461177} mate-1 single-end records and deterministically cycles those records until inputs contain exactly 100,000, 1,000,000, 5,000,000, and 10,000,000 alignments. The scaling step does not synthesize or modify coordinates, CIGAR strings, MAPQ values, tags, strands, or sequences, so the alignment distribution is held fixed while the number of records changes.
 
-Both tools use union, unstranded exon counting by \texttt{gene\_id} at MAPQ $\geq 10$, with secondary and supplementary alignments ignored and nonunique assignment set to \texttt{none}. Each target is measured \ScalingRepeats{} times per tool with the same single-thread settings and alternating execution order as the real-data matrix. Exact count equality is required for every target and repeat. Linear least-squares fits are calculated from median wall time against alignment count in millions.
+Both tools use union, unstranded exon counting by \texttt{gene\_id} at MAPQ $\geq 10$, with secondary and supplementary alignments ignored and nonunique assignment set to \texttt{none}. Each target is measured \ScalingRepeats{} times per tool with the same recorded TallySeq decoder setting and \texttt{-n 1} process setting as the real-data matrix, with alternating execution order. Exact count equality is required for every target and repeat. Linear least-squares fits are calculated from median wall time against alignment count in millions.
+
+
+\subsection{Large biological dataset and input-format benchmark}
+
+A separate benchmark evaluates a substantially larger biological workload using \texttt{SRR5724993}. The coordinate-sorted human RNA-seq alignment contains \LargeAlignmentCount{} mapped primary single-end alignments and no secondary or supplementary records. The BAM file is 1,395,604,082 bytes. Counting uses the 151,467,494-byte \texttt{hisat2-index-hg38\_genome\_tran.gtf} annotation with \texttt{intersection-strict}, unstranded exon counting by \texttt{gene\_name}, MAPQ $\geq 10$, \texttt{--nonunique none}, and scoring enabled for secondary and supplementary alignments. Because the input contains no secondary or supplementary records, those two options do not alter this dataset.
+
+SAM and CRAM representations are derived from the same BAM, and all three representations contain exactly \LargeAlignmentCount{} records. The SAM is approximately 12~GiB and the CRAM approximately 940~MiB. TallySeq and HTSeq output is compared exactly for every format and repeat before timings are accepted. Three wall-time and peak-RSS measurements are collected per tool and format on the same Intel Core i7-9750H/WSL2 system used for the other benchmarks.
+
+For the strict BAM comparison, TallySeq uses \texttt{--threads 0}, which disables additional BGZF decompression workers in the Rust BAM reader, while both tools use \texttt{-n 1}. The SAM reader is not affected by this BAM decompression setting. CRAM is benchmarked with no additional HTSlib decoding threads. TallySeq currently handles CRAM on Unix through its HTSlib compatibility path, converting the stream to a temporary BAM before the normal counting path processes it. The reported CRAM time therefore includes that conversion and temporary-file I/O.
 
 \section{Results}
 
 \subsection{Count parity}
 
-All \BenchmarkDatasetScenarioCount{} dataset--scenario comparisons produced exactly identical count tables between TallySeq and HTSeq 2.1.2. This covers the three overlap modes, three strandedness settings, single- and paired-end processing, coordinate- and name-sorted paired input, multimapper policies, MAPQ changes, secondary and supplementary alignments, multiple feature types, and compound feature identifiers. The scaling benchmark also produced exact equality at every record count and repeat.
+All \BenchmarkDatasetScenarioCount{} Pasilla dataset--scenario comparisons produced exactly identical count tables between TallySeq and HTSeq 2.1.2. This covers the three overlap modes, three strandedness settings, single- and paired-end processing, coordinate- and name-sorted paired input, multimapper policies, MAPQ changes, secondary and supplementary alignments, multiple feature types, and compound feature identifiers. The controlled scaling benchmark produced exact equality at every record count and repeat. The \texttt{SRR5724993} large-data benchmark also produced exact equality for all BAM, SAM, and CRAM measurements.
 
 \subsection{Runtime and memory}
 
@@ -169,11 +179,37 @@ Writing runtime as $t = a + bN$, where $N$ is the number of alignments in millio
 \label{fig:scaling}
 \end{figure}
 
+
+\subsection{Large biological dataset and file formats}
+
+The larger human RNA-seq dataset confirmed the performance difference on a 58.7-million-alignment workload (Table~\ref{tab:large-biological}). With BAM input and no additional TallySeq BGZF decompression workers, median wall time was \SI{\LargeBamTallyTime}{\second} for TallySeq and \SI{\LargeBamHTSeqTime}{\second} for HTSeq, a \LargeBamSpeedup{}-fold ratio. Median peak RSS was \LargeBamTallyRSS{}~MiB and \LargeBamHTSeqRSS{}~MiB, respectively.
+
+\begin{table}[ht]
+\centering
+\caption{Large biological dataset benchmark on \texttt{SRR5724993}, containing 58,663,336 mapped primary single-end alignments. Values are medians of three runs. Every TallySeq result was exactly identical to the corresponding HTSeq count table.}
+\label{tab:large-biological}
+\begin{tabular}{lrrrrr}
+\toprule
+Format & \multicolumn{2}{c}{Time (s)} & Speed ratio & \multicolumn{2}{c}{Peak RSS (MiB)} \\
+\cmidrule(lr){2-3}\cmidrule(lr){5-6}
+ & TallySeq & HTSeq & $\times$ & TallySeq & HTSeq \\
+\midrule
+BAM  & \LargeBamTallyTime{}  & \LargeBamHTSeqTime{}  & \LargeBamSpeedup{}  & \LargeBamTallyRSS{}  & \LargeBamHTSeqRSS{} \\
+SAM  & \LargeSamTallyTime{}  & \LargeSamHTSeqTime{}  & \LargeSamSpeedup{}  & \LargeSamTallyRSS{}  & \LargeSamHTSeqRSS{} \\
+CRAM & \LargeCramTallyTime{} & \LargeCramHTSeqTime{} & \LargeCramSpeedup{} & \LargeCramTallyRSS{} & \LargeCramHTSeqRSS{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The input representation materially affected both tools. TallySeq's median runtime increased from \SI{\LargeBamTallyTime}{\second} for BAM to \SI{\LargeSamTallyTime}{\second} for SAM and \SI{\LargeCramTallyTime}{\second} for CRAM. HTSeq required \SI{\LargeBamHTSeqTime}{\second}, \SI{\LargeSamHTSeqTime}{\second}, and \SI{\LargeCramHTSeqTime}{\second}, respectively. The smaller TallySeq/HTSeq ratio for CRAM reflects a different I/O path in TallySeq: CRAM is decoded through HTSlib and materialized as a temporary BAM before counting, so the benchmark includes conversion and temporary-file I/O in addition to feature assignment.
+
 \section{Discussion}
 
 The differential tests and real-data benchmarks support the main compatibility goal: TallySeq reproduces HTSeq 2.1.2 count output across the tested overlap modes, strandedness modes, paired-end orderings, multimapper policies, filtering options, and annotation configurations. Exact equality is checked before a benchmark timing is accepted, so the performance comparison is tied directly to equivalent count output.
 
-The runtime difference is visible in both the small real-data matrix and the controlled scaling experiment. The scaling fit is especially informative because the alignment distribution and annotation are held constant while only the number of records changes. TallySeq's fitted slope of \ScalingTallySlope{} seconds per million alignments is substantially lower than HTSeq's \ScalingHTSeqSlope{} seconds per million. The fitted intercepts also differ, although they should be interpreted only as regression parameters rather than direct measurements of annotation parsing or startup cost.
+The runtime difference is visible in the broad Pasilla matrix, the controlled scaling experiment, and the 58.7-million-alignment human dataset. The large BAM benchmark is particularly useful because it combines a full human annotation with a biological alignment set large enough for counting time to dominate startup costs. Its \LargeBamSpeedup{}-fold median runtime ratio is consistent with the scale of the differences observed in the Pasilla matrix and controlled BAM scaling experiment.
+
+The scaling fit is especially informative because the alignment distribution and annotation are held constant while only the number of records changes. TallySeq's fitted slope of \ScalingTallySlope{} seconds per million alignments is substantially lower than HTSeq's \ScalingHTSeqSlope{} seconds per million. The fitted intercepts also differ, although they should be interpreted only as regression parameters rather than direct measurements of annotation parsing or startup cost. The format benchmark shows that I/O representation matters as well: uncompressed SAM increases data movement, while TallySeq's current CRAM compatibility path incurs a full CRAM-to-BAM conversion before counting.
 
 TallySeq's counting path uses integer feature identifiers, immutable chromosome-specific interval trees, pruned range queries, reusable alignment buffers, and limited allocation of temporary strings. Multi-file invocations share one parsed annotation index and can process alignment inputs concurrently. These design choices reduce work in the hot path while retaining HTSeq-compatible assignment rules.
 
@@ -183,7 +219,7 @@ The benchmark results are most useful for workflows that already rely on \texttt
 
 TallySeq targets the \texttt{htseq-count} command rather than the complete HTSeq Python API. CRAM input is unavailable in the native Windows package because its CRAM compatibility path depends on HTSlib. The \texttt{--nonunique random} mode is implemented, but individual ambiguous-read assignments are not expected to match exactly because TallySeq and HTSeq use independent random-number generators.
 
-Performance measurements were collected on one x86\_64 workstation under WSL2 with one TallySeq decoding thread and one alignment-processing process for both tools. Absolute runtimes will vary with processor, storage, operating system, and file compression. The benchmark does not measure multi-file parallel throughput, CRAM performance, or annotated SAM/BAM output throughput.
+Performance measurements were collected on one x86\_64 workstation under WSL2. Both tools used one alignment-processing process per input. The Pasilla and controlled-scaling runs used the recorded TallySeq \texttt{--threads 1} setting; for the Rust BAM reader this corresponds to one additional BGZF decompression worker, not one total CPU thread. The strict large-BAM comparison therefore uses \texttt{--threads 0}, which disables additional BGZF workers. Absolute runtimes will vary with processor, storage, operating system, file compression, and cache state. The benchmark does not measure multi-file parallel throughput or annotated SAM/BAM output throughput.
 
 The scaling inputs deliberately repeat real alignment records to hold the alignment distribution constant. This isolates read-count scaling, but it does not reproduce increasing genomic diversity, annotation complexity, or the compression characteristics of an independently sequenced 10-million-read dataset. The benchmark therefore supports conclusions about scaling with record count under a controlled workload, not every property of large sequencing datasets.
 
