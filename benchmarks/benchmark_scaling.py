@@ -238,7 +238,7 @@ def main() -> int:
         "--rust-threads",
         type=int,
         default=1,
-        help="TallySeq BAM decoding threads. Default: 1.",
+        help="TallySeq --threads setting. Native BAM interprets this as additional BGZF decompression workers; use 0 for none. Default: 1.",
     )
     ap.add_argument(
         "--nprocesses",
