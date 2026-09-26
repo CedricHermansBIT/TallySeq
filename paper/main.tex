@@ -1,25 +1,27 @@
 \documentclass[11pt]{article}
 
-\usepackage[margin=2.5cm]{geometry}
-\usepackage{authblk}
+\usepackage[a4paper,margin=2.2cm]{geometry}
 \usepackage{booktabs}
 \usepackage{microtype}
+\usepackage{xspace}
 \usepackage{siunitx}
-\usepackage{hyperref}
-\usepackage{natbib}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
 \usepackage{xcolor}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 
-\hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue}
 \input{benchmark_macros.tex}
 \input{scaling_macros.tex}
 \input{large_biological_macros.tex}
 
-\title{TallySeq: a high-performance, HTSeq-compatible read counting tool in Rust}
-\author[1]{Cedric Hermans}
-\affil[1]{BIT\textsuperscript{2}lab, Howest University of Applied Sciences, Bruges, Belgium}
-\date{}
+\newcommand{\tallyseq}{\textsc{TallySeq}\xspace}
+
+\title{\tallyseq: a high-performance, HTSeq-compatible read counting tool in Rust}
+\author{Cedric Hermans\\
+Howest University of Applied Sciences, Belgium\\
+\href{https://orcid.org/0000-0002-9310-1876}{ORCID: 0000-0002-9310-1876}}
+\date{Preprint -- September 2026}
 
 \begin{document}
 \maketitle
